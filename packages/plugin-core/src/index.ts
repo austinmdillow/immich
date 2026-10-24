@@ -3,13 +3,13 @@ import { AssetVisibility } from '@immich/sdk';
 import type { Manifest } from '../dist/index.d.ts';
 
 type MatchValueConfig = {
-  pattern: string;
-  matchType?: 'contains' | 'exact' | 'regex' | 'startsWith';
+  pattern?: string;
+  matchType?: 'contains' | 'exact' | 'regex' | 'startsWith' | 'missing';
   caseSensitive?: boolean;
 };
 
 const matchValueResult = (value: string, config: MatchValueConfig) => {
-  const { pattern, matchType = 'contains', caseSensitive = false } = config;
+  const { pattern = '', matchType = 'contains', caseSensitive = false } = config;
   const searchName = caseSensitive ? value : value.toLowerCase();
   const searchPattern = caseSensitive ? pattern : pattern.toLowerCase();
 
@@ -134,12 +134,20 @@ const methods = wrapper<Manifest>({
     return { workflow: { continue: earthDiameter * delta <= (config.coordinate?.radius ?? 0) } };
   },
 
-  assetExifFilter: ({ config, data }) => {
-    if (!data.asset.exifInfo || data.asset.exifInfo[config.property] === null) {
+assetExifFilter: ({ config, data }) => {
+    const value = data.asset.exifInfo?.[config.property];
+
+    // TODO: Should we treat an empty "" exif value as present?
+    // No model is show in immich web UI, but the property IS there
+    const valueIsMissing = (value === null || value === undefined || value === '');
+
+    if (config.matchType === "missing") {
+      return { workflow: { continue: valueIsMissing } };
+    } else if (valueIsMissing) {
       return { workflow: { continue: false } };
     }
 
-    return matchValueResult(String(data.asset.exifInfo[config.property]), config);
+    return matchValueResult(String(value), config);
   },
 
   assetDateFilter: ({ config, data }) => {
