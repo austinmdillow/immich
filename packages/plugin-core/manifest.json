@@ -407,7 +407,7 @@
           "matchType": {
             "type": "string",
             "title": "Match type",
-            "enum": ["contains", "startsWith", "exact", "regex", "missing"],
+            "enum": ["contains", "startsWith", "exact", "regex", "present", "missing"],
             "default": "contains",
             "description": "Type of pattern matching to perform",
             "uiHint": {

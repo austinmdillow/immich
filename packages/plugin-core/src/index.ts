@@ -4,12 +4,17 @@ import type { Manifest } from '../dist/index.d.ts';
 
 type MatchValueConfig = {
   pattern?: string;
-  matchType?: 'contains' | 'exact' | 'regex' | 'startsWith' | 'missing';
+  matchType?: 'contains' | 'exact' | 'regex' | 'startsWith' | 'missing' | 'present';
   caseSensitive?: boolean;
 };
 
-const matchValueResult = (value: string, config: MatchValueConfig) => {
+const matchValueResult = (value: string | null | undefined, config: MatchValueConfig) => {
   const { pattern = '', matchType = 'contains', caseSensitive = false } = config;
+
+  if (value == null) {
+    return { workflow: { continue: matchType == 'missing' } };
+  }
+
   const searchName = caseSensitive ? value : value.toLowerCase();
   const searchPattern = caseSensitive ? pattern : pattern.toLowerCase();
 
@@ -30,6 +35,15 @@ const matchValueResult = (value: string, config: MatchValueConfig) => {
       const flags = caseSensitive ? '' : 'i';
       const regex = new RegExp(searchPattern, flags);
       return { workflow: { continue: regex.test(value) } };
+    }
+
+    case 'present': {
+      return { workflow: { continue: true } };
+    }
+
+    case 'missing': {
+      // value is not null at this point
+      return { workflow: { continue: false } };
     }
 
     default: {
@@ -134,20 +148,11 @@ const methods = wrapper<Manifest>({
     return { workflow: { continue: earthDiameter * delta <= (config.coordinate?.radius ?? 0) } };
   },
 
-assetExifFilter: ({ config, data }) => {
-    const value = data.asset.exifInfo?.[config.property];
+  assetExifFilter: ({ config, data }) => {
+    let value = data.asset.exifInfo?.[config.property];
 
-    // TODO: Should we treat an empty "" exif value as present?
-    // No model is show in immich web UI, but the property IS there
-    const valueIsMissing = (value === null || value === undefined || value === '');
-
-    if (config.matchType === "missing") {
-      return { workflow: { continue: valueIsMissing } };
-    } else if (valueIsMissing) {
-      return { workflow: { continue: false } };
-    }
-
-    return matchValueResult(String(value), config);
+    // Empty EXIF value is treated as missing to mirror behavior of the web UI
+    return matchValueResult(value == null || value === '' ? null : String(value), config);
   },
 
   assetDateFilter: ({ config, data }) => {
